@@ -128,9 +128,10 @@ export async function setFocus(id: ID, day: LocalDate | null, now = new Date()):
   });
 }
 
-/** Supprime une tâche et nettoie les références vers elle (projet, note). */
+/** Supprime une tâche et nettoie les références vers elle (projet, note, sessions de focus). */
 export async function deleteTask(id: ID): Promise<void> {
-  await db.transaction('rw', db.tasks, db.projects, db.notes, async () => {
+  await db.transaction('rw', [db.tasks, db.projects, db.notes, db.focusSessions], async () => {
+    await db.focusSessions.where('taskId').equals(id).modify({ taskId: null });
     await db.projects.filter((p) => p.nextActionTaskId === id).modify({ nextActionTaskId: null });
     await db.notes.filter((n) => n.taskId === id).modify({ taskId: null });
     await db.tasks.delete(id);

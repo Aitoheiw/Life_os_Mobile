@@ -1,6 +1,6 @@
 # Life OS
 
-Application personnelle d'organisation : tâches, projets, objectifs, habitudes, notes et bilan hebdomadaire.
+Application personnelle d'organisation : tâches, projets, objectifs, habitudes, notes, minuteur Pomodoro et bilan hebdomadaire.
 Elle fonctionne entièrement dans ton navigateur, sans compte ni abonnement. Tes données restent sur ton ordinateur.
 
 ## Démarrer

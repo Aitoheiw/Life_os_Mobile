@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import type { Goal, Habit, HabitLog, Note, Project, Task, WeeklyReview } from '../models';
+import type { FocusSession, Goal, Habit, HabitLog, Note, Project, Task, WeeklyReview } from '../models';
 import { ALL_TABLES, db, SCHEMA_VERSION, type TableName } from '../db/database';
 import { nowIso } from '../domain/dates';
 import {
+  focusSessionSchema,
   goalSchema,
   habitLogSchema,
   habitSchema,
@@ -28,6 +29,7 @@ export interface BackupData {
   habitLogs: HabitLog[];
   notes: Note[];
   weeklyReviews: WeeklyReview[];
+  focusSessions: FocusSession[];
 }
 
 export interface Backup {
@@ -47,6 +49,7 @@ export const TABLE_LABELS: Record<TableName, string> = {
   habitLogs: 'Réalisations d’habitudes',
   notes: 'Notes et idées',
   weeklyReviews: 'Bilans hebdomadaires',
+  focusSessions: 'Sessions de focus',
 };
 
 const ENTITY_SCHEMAS: { [K in TableName]: z.ZodType<BackupData[K][number]> } = {
@@ -57,6 +60,7 @@ const ENTITY_SCHEMAS: { [K in TableName]: z.ZodType<BackupData[K][number]> } = {
   habitLogs: habitLogSchema,
   notes: noteSchema,
   weeklyReviews: weeklyReviewSchema,
+  focusSessions: focusSessionSchema,
 };
 
 // ---------- Export ----------
@@ -64,7 +68,7 @@ const ENTITY_SCHEMAS: { [K in TableName]: z.ZodType<BackupData[K][number]> } = {
 /** Lit toute la base dans une transaction (instantané cohérent). */
 export async function exportBackup(now = new Date()): Promise<Backup> {
   return db.transaction('r', ALL_TABLES.map((t) => db.table(t)), async () => {
-    const [tasks, projects, goals, habits, habitLogs, notes, weeklyReviews] = await Promise.all([
+    const [tasks, projects, goals, habits, habitLogs, notes, weeklyReviews, focusSessions] = await Promise.all([
       db.tasks.toArray(),
       db.projects.toArray(),
       db.goals.toArray(),
@@ -72,12 +76,13 @@ export async function exportBackup(now = new Date()): Promise<Backup> {
       db.habitLogs.toArray(),
       db.notes.toArray(),
       db.weeklyReviews.toArray(),
+      db.focusSessions.toArray(),
     ]);
     return {
       format: BACKUP_FORMAT,
       schemaVersion: SCHEMA_VERSION,
       exportedAt: nowIso(now),
-      data: { tasks, projects, goals, habits, habitLogs, notes, weeklyReviews },
+      data: { tasks, projects, goals, habits, habitLogs, notes, weeklyReviews, focusSessions },
     };
   });
 }
@@ -130,7 +135,8 @@ export function parseBackup(text: string): ParsedBackup {
   }
   if (typeof data !== 'object' || data === null) throw new ValidationError('La sauvegarde ne contient pas de données.');
 
-  // Les futures migrations de fichiers anciens (schemaVersion < SCHEMA_VERSION) se feront ici.
+  // Migrations de fichiers anciens : une sauvegarde v1 n'a pas de section `focusSessions`,
+  // elle est alors considérée comme vide (voir `?? []` ci-dessous).
 
   const out = {} as BackupData;
   for (const table of ALL_TABLES) {
@@ -204,6 +210,8 @@ export function repairRelations(data: BackupData): string[] {
     if (note.taskId && !taskIds.has(note.taskId)) note.taskId = null;
   }
   if (n) warnings.push(`${n} lien(s) de note vers un projet ou objectif absent ont été retirés.`);
+
+  for (const f of data.focusSessions) if (f.taskId && !taskIds.has(f.taskId)) f.taskId = null;
 
   const seen = new Set<string>();
   const before = data.habitLogs.length;

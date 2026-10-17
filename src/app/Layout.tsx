@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
-import { CalendarCheck, CheckSquare, FolderKanban, Inbox, Lightbulb, Menu, NotebookPen, Plus, Repeat, Settings, Target, X } from 'lucide-react';
+import { CalendarCheck, CheckSquare, FolderKanban, Inbox, Lightbulb, Menu, NotebookPen, Plus, Repeat, Settings, Target, Timer, X } from 'lucide-react';
 import { useEditors } from './editors';
 import { useInboxCount } from '../hooks/useData';
+import { usePomodoro } from './pomodoro';
+import { formatClock } from '../domain/pomodoro';
 import { cx } from '../components/ui';
 
 const NAV: { to: string; label: string; icon: ReactNode; end?: boolean }[] = [
@@ -13,6 +15,7 @@ const NAV: { to: string; label: string; icon: ReactNode; end?: boolean }[] = [
   { to: '/goals', label: 'Objectifs', icon: <Target size={17} /> },
   { to: '/habits', label: 'Habitudes', icon: <Repeat size={17} /> },
   { to: '/notes', label: 'Notes', icon: <NotebookPen size={17} /> },
+  { to: '/focus', label: 'Focus', icon: <Timer size={17} /> },
   { to: '/review', label: 'Bilan de la semaine', icon: <Lightbulb size={17} /> },
 ];
 
@@ -83,6 +86,7 @@ export function Layout() {
 
 function NavItem({ to, label, icon, end }: { to: string; label: string; icon: ReactNode; end?: boolean }) {
   const inbox = useInboxCount();
+  const pomodoro = usePomodoro();
   return (
     <NavLink
       to={to}
@@ -94,6 +98,11 @@ function NavItem({ to, label, icon, end }: { to: string; label: string; icon: Re
       {icon}
       <span className="flex-1">{label}</span>
       {to === '/inbox' && !!inbox && <span className="rounded-md bg-accent-soft px-1.5 text-xs font-medium text-accent">{inbox}</span>}
+      {to === '/focus' && pomodoro.state.status !== 'idle' && (
+        <span className={cx('font-mono text-xs tabular-nums', pomodoro.state.status === 'running' ? (pomodoro.state.phase === 'focus' ? 'text-accent' : 'text-success') : 'text-faint')}>
+          {formatClock(pomodoro.remaining)}
+        </span>
+      )}
     </NavLink>
   );
 }

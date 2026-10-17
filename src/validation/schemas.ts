@@ -118,6 +118,15 @@ export const weeklyReviewSchema = z.object({
   ...timestamps,
 });
 
+export const focusSessionSchema = z.object({
+  id,
+  taskId: id.nullable(),
+  date: localDate,
+  startedAt: isoInstant,
+  endedAt: isoInstant,
+  minutes: z.number().int().min(1).max(600),
+});
+
 /** Erreur de validation avec un message lisible par l'utilisateur. */
 export class ValidationError extends Error {
   constructor(message: string) {

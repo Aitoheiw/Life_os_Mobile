@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { CheckCircle2, ChevronLeft, ChevronRight, Clock, FolderKanban, History } from 'lucide-react';
 import type { WeeklyReview } from '../models';
-import { useProjects, useReviews, useTasks, useToday } from '../hooks/useData';
+import { useFocusSessions, useProjects, useReviews, useTasks, useToday } from '../hooks/useData';
+import { focusTotals, formatMinutes } from '../domain/pomodoro';
 import { saveWeeklyReview } from '../db/reviews';
 import { summarizeWeek } from '../domain/review';
 import { addDays, formatShort, startOfWeek } from '../domain/dates';
@@ -12,12 +13,14 @@ export function ReviewPage() {
   const tasks = useTasks();
   const projects = useProjects();
   const reviews = useReviews();
+  const sessions = useFocusSessions();
   const day = useToday();
   const currentWeek = startOfWeek(day);
   const [week, setWeek] = useState(currentWeek);
 
   const summary = useMemo(() => summarizeWeek(week, day, tasks ?? [], projects ?? []), [week, day, tasks, projects]);
-  if (!tasks || !projects || !reviews) return null;
+  if (!tasks || !projects || !reviews || !sessions) return null;
+  const focus = focusTotals(sessions, summary.weekStart, summary.weekEnd);
 
   const review = reviews.find((r) => r.weekStart === week);
   const isCurrent = week === currentWeek;
@@ -38,6 +41,7 @@ export function ReviewPage() {
           </Button>
         )}
         {review && <Badge tone="success">Bilan rédigé</Badge>}
+        {focus.count > 0 && <Badge>Focus : {formatMinutes(focus.minutes)} ({focus.count} sessions)</Badge>}
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">

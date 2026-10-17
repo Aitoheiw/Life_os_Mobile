@@ -148,3 +148,17 @@ export interface WeeklyReview extends Timestamps {
   /** Trois priorités pour la semaine suivante. */
   nextPriorities: [string, string, string];
 }
+
+// ---------- Sessions de focus (Pomodoro) ----------
+
+/** Session de focus terminée. Les sessions abandonnées ne sont pas enregistrées. */
+export interface FocusSession {
+  /** Dérivé de l'instant de début : enregistrer deux fois la même session est sans effet. */
+  id: ID;
+  taskId: ID | null;
+  /** Jour local de fin de session. */
+  date: LocalDate;
+  startedAt: string;
+  endedAt: string;
+  minutes: number;
+}

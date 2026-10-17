@@ -16,6 +16,7 @@ export const useHabits = () => useLiveQuery(() => db.habits.toArray(), []);
 export const useHabitLogs = () => useLiveQuery(() => db.habitLogs.toArray(), []);
 export const useNotes = () => useLiveQuery(() => db.notes.orderBy('updatedAt').reverse().toArray(), []);
 export const useReviews = () => useLiveQuery(() => db.weeklyReviews.orderBy('weekStart').reverse().toArray(), []);
+export const useFocusSessions = () => useLiveQuery(() => db.focusSessions.orderBy('date').reverse().toArray(), []);
 export const useInboxCount = () => useLiveQuery(() => db.notes.where('status').equals('open').filter((n) => n.kind === 'idea').count(), []);
 
 /**

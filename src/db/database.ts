@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Goal, Habit, HabitLog, Note, Project, Task, WeeklyReview } from '../models';
+import type { FocusSession, Goal, Habit, HabitLog, Note, Project, Task, WeeklyReview } from '../models';
 
 /**
  * Base IndexedDB de l'application.
@@ -17,6 +17,7 @@ export class LifeOsDatabase extends Dexie {
   habitLogs!: EntityTable<HabitLog, 'id'>;
   notes!: EntityTable<Note, 'id'>;
   weeklyReviews!: EntityTable<WeeklyReview, 'id'>;
+  focusSessions!: EntityTable<FocusSession, 'id'>;
 
   constructor(name = 'life-os') {
     super(name);
@@ -30,11 +31,15 @@ export class LifeOsDatabase extends Dexie {
       notes: 'id, kind, status, projectId, goalId, updatedAt',
       weeklyReviews: 'id, &weekStart',
     });
+    // v2 : ajout des sessions Pomodoro (les tables existantes sont inchangées).
+    this.version(2).stores({
+      focusSessions: 'id, date, taskId',
+    });
   }
 }
 
 /** Version actuelle du schéma, reprise dans les fichiers de sauvegarde. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const db = new LifeOsDatabase();
 
@@ -46,5 +51,6 @@ export const ALL_TABLES = [
   'habitLogs',
   'notes',
   'weeklyReviews',
+  'focusSessions',
 ] as const;
 export type TableName = (typeof ALL_TABLES)[number];
