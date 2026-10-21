@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Archive, Pause, Pencil, Play, Plus, Repeat, RotateCcw, Trash2 } from 'lucide-react';
 import type { Habit, HabitFrequency, HabitLog } from '../models';
 import { useHabitLogs, useHabits, useToday } from '../hooks/useData';
@@ -9,6 +9,8 @@ import { errorMessage, useFeedback } from '../app/feedback';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorMessage, Field, IconButton, Input, Modal, PageHeader, Select, Textarea, cx } from '../components/ui';
 import { WeekdayPicker } from '../components/WeekdayPicker';
 import { HabitCheck } from '../components/habits/HabitCheck';
+import { BadgeGrid, ProgressPanel, StreakFlame } from '../components/habits/Progress';
+import { computeGamification, xpForToday, type GamificationSummary, type HabitProgress } from '../domain/gamification';
 
 export function HabitsPage() {
   const habits = useHabits();
@@ -16,8 +18,10 @@ export function HabitsPage() {
   const day = useToday();
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const summary = useMemo(() => (habits && logs ? computeGamification(habits, logs, day) : null), [habits, logs, day]);
+  const celebrate = useCelebrations(summary);
 
-  if (!habits || !logs) return null;
+  if (!habits || !logs || !summary) return null;
   const active = habits.filter((h) => h.status === 'active');
   const paused = habits.filter((h) => h.status === 'paused');
   const archived = habits.filter((h) => h.status === 'archived');
@@ -41,18 +45,22 @@ export function HabitsPage() {
           </EmptyState>
         </Card>
       ) : (
-        <div className="space-y-6">
-          <HabitSection title="Actives" habits={active} logs={logs} day={day} onEdit={setEditing} empty="Aucune habitude active." />
-          {paused.length > 0 && <HabitSection title="Suspendues" habits={paused} logs={logs} day={day} onEdit={setEditing} />}
-          {archived.length > 0 && (
-            <section>
-              <button type="button" onClick={() => setShowArchived((v) => !v)} className="mb-3 text-xs font-semibold tracking-wide text-muted uppercase hover:text-fg">
-                Archivées ({archived.length}) · {showArchived ? 'masquer' : 'afficher'}
-              </button>
-              {showArchived && <HabitSection habits={archived} logs={logs} day={day} onEdit={setEditing} />}
-            </section>
-          )}
-        </div>
+        <>
+          <ProgressPanel summary={summary} celebrate={celebrate} />
+          <div className="space-y-6">
+            <HabitSection title="Actives" habits={active} logs={logs} day={day} summary={summary} onEdit={setEditing} empty="Aucune habitude active." />
+            {paused.length > 0 && <HabitSection title="Suspendues" habits={paused} logs={logs} day={day} summary={summary} onEdit={setEditing} />}
+            {archived.length > 0 && (
+              <section>
+                <button type="button" onClick={() => setShowArchived((v) => !v)} className="mb-3 text-xs font-semibold tracking-wide text-muted uppercase hover:text-fg">
+                  Archivées ({archived.length}) · {showArchived ? 'masquer' : 'afficher'}
+                </button>
+                {showArchived && <HabitSection habits={archived} logs={logs} day={day} summary={summary} onEdit={setEditing} />}
+              </section>
+            )}
+          </div>
+          <BadgeGrid summary={summary} />
+        </>
       )}
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Nouvelle habitude' : 'Modifier l’habitude'}>
@@ -62,7 +70,7 @@ export function HabitsPage() {
   );
 }
 
-function HabitSection({ title, habits, logs, day, onEdit, empty }: { title?: string; habits: Habit[]; logs: HabitLog[]; day: string; onEdit: (h: Habit) => void; empty?: string }) {
+function HabitSection({ title, habits, logs, day, summary, onEdit, empty }: { title?: string; habits: Habit[]; logs: HabitLog[]; day: string; summary: GamificationSummary; onEdit: (h: Habit) => void; empty?: string }) {
   return (
     <section>
       {title && <h2 className="mb-3 text-xs font-semibold tracking-wide text-muted uppercase">{title}</h2>}
@@ -71,7 +79,7 @@ function HabitSection({ title, habits, logs, day, onEdit, empty }: { title?: str
       ) : (
         <Card className="divide-y divide-line">
           {habits.map((h) => (
-            <HabitRow key={h.id} habit={h} logs={logs} day={day} onEdit={() => onEdit(h)} />
+            <HabitRow key={h.id} habit={h} logs={logs} day={day} progress={summary.perHabit.get(h.id)!} onEdit={() => onEdit(h)} />
           ))}
         </Card>
       )}
@@ -79,9 +87,32 @@ function HabitSection({ title, habits, logs, day, onEdit, empty }: { title?: str
   );
 }
 
+/**
+ * Repère les progrès faits pendant la visite (pas au chargement de la page) :
+ * niveau gagné et badge débloqué → message ; journée parfaite → confettis.
+ * Retourne un compteur qui change à chaque journée parfaite (clé des confettis).
+ */
+function useCelebrations(summary: GamificationSummary | null): number {
+  const { notify } = useFeedback();
+  const previous = useRef<GamificationSummary | null>(null);
+  const [celebrate, setCelebrate] = useState(0);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = summary;
+    if (!before || !summary) return;
+    if (summary.level.level > before.level.level) notify(`Niveau ${summary.level.level} atteint · ${summary.level.title}`);
+    for (const b of summary.badges) {
+      if (b.unlocked && !before.badges.find((x) => x.id === b.id)?.unlocked) notify(`Badge débloqué : ${b.name}`);
+    }
+    const perfect = (s: GamificationSummary) => s.today.due > 0 && s.today.done === s.today.due;
+    if (perfect(summary) && !perfect(before)) setCelebrate((c) => c + 1);
+  }, [summary, notify]);
+  return celebrate;
+}
+
 const pct = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)} %`);
 
-function HabitRow({ habit, logs, day, onEdit }: { habit: Habit; logs: HabitLog[]; day: string; onEdit: () => void }) {
+function HabitRow({ habit, logs, day, progress, onEdit }: { habit: Habit; logs: HabitLog[]; day: string; progress: HabitProgress; onEdit: () => void }) {
   const { run } = useFeedback();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const own = useMemo(() => logs.filter((l) => l.habitId === habit.id), [logs, habit.id]);
@@ -92,14 +123,19 @@ function HabitRow({ habit, logs, day, onEdit }: { habit: Habit; logs: HabitLog[]
   const doneToday = doneDays.has(day);
 
   return (
-    <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center">
+    <div className="flex flex-col gap-3 px-4 py-3.5 transition-colors duration-200 hover:bg-surface-2/30 lg:flex-row lg:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <HabitCheck habit={habit} day={day} done={doneToday} disabled={habit.status !== 'active'} />
+        <HabitCheck habit={habit} day={day} done={doneToday} disabled={habit.status !== 'active'} xpGain={xpForToday(habit, progress, day)} />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{habit.name}</p>
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <span className="truncate">{habit.name}</span>
+            <StreakFlame progress={progress} doneToday={doneToday} />
+          </p>
           <p className="text-xs text-muted">
             {describeFrequency(habit)}
             {habit.status === 'active' && !dueToday && ' · pas prévue aujourd’hui'}
+            {progress.streakAtRisk && <span className="text-warning"> · série de {progress.currentStreak} j en jeu</span>}
+            {progress.bestStreak > 0 && <span className="text-faint"> · record {progress.bestStreak} j</span>}
           </p>
         </div>
       </div>
@@ -158,7 +194,7 @@ function History({ habit, doneDays, day }: { habit: Habit; doneDays: Set<string>
             disabled={habit.status === 'archived' || (!scheduled && !done)}
             onClick={() => run(() => toggleHabitLog(habit.id, d))}
             className={cx(
-              'w-[7px] rounded-[2px] sm:w-2',
+              'w-[7px] rounded-[2px] transition-all duration-300 ease-smooth sm:w-2',
               done ? 'h-4 bg-success' : scheduled ? 'h-4 bg-faint/40 hover:bg-faint' : 'h-1 bg-line',
               d === day && 'ring-1 ring-faint ring-offset-1 ring-offset-surface',
             )}

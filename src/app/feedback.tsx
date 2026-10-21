@@ -53,12 +53,12 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   return (
     <FeedbackContext.Provider value={{ notify, run }}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed right-4 bottom-4 z-50 flex flex-col gap-2">
+      <div aria-live="polite" className="pointer-events-none fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 md:inset-x-auto md:right-4 md:bottom-4 md:items-end">
         {toasts.map((t) => (
           <div
             key={t.id}
             className={cx(
-              'pointer-events-auto flex max-w-sm items-start gap-2 rounded-lg border bg-surface px-3 py-2.5 text-sm shadow-lg',
+              'animate-toast pointer-events-auto flex max-w-sm items-start gap-2 rounded-xl border bg-surface px-3 py-2.5 text-sm shadow-lg',
               t.kind === 'error' ? 'border-danger/40 text-danger' : 'border-line text-fg',
             )}
           >

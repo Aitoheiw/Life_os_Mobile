@@ -52,7 +52,7 @@ export const TABLE_LABELS: Record<TableName, string> = {
   focusSessions: 'Sessions de focus',
 };
 
-const ENTITY_SCHEMAS: { [K in TableName]: z.ZodType<BackupData[K][number]> } = {
+export const ENTITY_SCHEMAS: { [K in TableName]: z.ZodType<BackupData[K][number]> } = {
   tasks: taskSchema,
   projects: projectSchema,
   goals: goalSchema,

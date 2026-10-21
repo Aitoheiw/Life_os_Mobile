@@ -13,6 +13,8 @@ import { formatLong } from '../domain/dates';
 import { Button, Card, CardHeader, ProgressBar, Select } from '../components/ui';
 import { TaskList } from '../components/tasks/TaskList';
 import { HabitCheck } from '../components/habits/HabitCheck';
+import { StreakFlame } from '../components/habits/Progress';
+import { computeGamification, xpForToday } from '../domain/gamification';
 
 /** Tableau de bord : ce qui compte aujourd'hui, lisible en quelques secondes. */
 export function TodayPage() {
@@ -26,8 +28,9 @@ export function TodayPage() {
   const { run } = useFeedback();
 
   const projectById = useMemo(() => new Map((projects ?? []).map((p) => [p.id, p])), [projects]);
+  const gamification = useMemo(() => (habits && logs ? computeGamification(habits, logs, day) : null), [habits, logs, day]);
 
-  if (!tasks || !projects || !habits || !logs || !notes) return null;
+  if (!tasks || !projects || !habits || !logs || !notes || !gamification) return null;
 
   const focus = tasks.filter((t) => t.focusDate === day).sort(compareTasks);
   const focusIds = new Set(focus.map((t) => t.id));
@@ -121,22 +124,26 @@ export function TodayPage() {
               title="Habitudes"
               icon={<Repeat size={14} />}
               action={
-                <Link to="/habits" className="text-xs text-muted hover:text-fg">
-                  Gérer
+                <Link to="/habits" className="text-xs text-muted transition-colors hover:text-fg">
+                  Niv. {gamification.level.level} · {gamification.level.title}
                 </Link>
               }
             />
             {dueHabits.length ? (
               <ul className="px-2 pb-2">
-                {dueHabits.map((h) => (
-                  <li key={h.id} className="flex items-center gap-3 rounded-lg px-2 py-2">
-                    <HabitCheck habit={h} day={day} done={doneHabitIds.has(h.id)} />
-                    <div className="min-w-0">
-                      <p className={`truncate text-sm ${doneHabitIds.has(h.id) ? 'text-faint line-through' : ''}`}>{h.name}</p>
-                      <p className="text-xs text-faint">{describeFrequency(h)}</p>
-                    </div>
-                  </li>
-                ))}
+                {dueHabits.map((h) => {
+                  const p = gamification.perHabit.get(h.id)!;
+                  return (
+                    <li key={h.id} className="flex items-center gap-3 rounded-lg px-2 py-2">
+                      <HabitCheck habit={h} day={day} done={doneHabitIds.has(h.id)} xpGain={xpForToday(h, p, day)} />
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm transition-colors duration-300 ${doneHabitIds.has(h.id) ? 'text-faint line-through' : ''}`}>{h.name}</p>
+                        <p className="text-xs text-faint">{describeFrequency(h)}</p>
+                      </div>
+                      <StreakFlame progress={p} doneToday={doneHabitIds.has(h.id)} />
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="px-4 pb-4 text-sm text-muted">{habits.some((h) => h.status === 'active') ? 'Aucune habitude prévue aujourd’hui.' : 'Aucune habitude active.'}</p>

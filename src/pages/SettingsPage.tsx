@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Download, HardDrive, Moon, Sun, Upload } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { AlertTriangle, Cloud, Download, HardDrive, LogOut, Moon, RefreshCw, Sun, Upload } from 'lucide-react';
+import { signIn, signOut, signUp, syncNow, useSync } from '../sync/sync';
+import { SyncBadge } from '../components/SyncBadge';
 import { ALL_TABLES } from '../db/database';
 import { backupFileName, countDatabase, exportBackup, parseBackup, restoreBackup, TABLE_LABELS, type BackupCounts, type ParsedBackup } from '../backup/backup';
 import { errorMessage, useFeedback } from '../app/feedback';
-import { getStoredTheme, setTheme, type Theme } from '../app/theme';
-import { Button, Card, CardHeader, ErrorMessage, Input, PageHeader, cx } from '../components/ui';
+import { useTheme } from '../app/theme';
+import { Button, Card, CardHeader, ErrorMessage, Field, Input, PageHeader, cx } from '../components/ui';
 
 const CONFIRM_WORD = 'REMPLACER';
 
@@ -22,14 +24,108 @@ async function downloadBackup(): Promise<void> {
 export function SettingsPage() {
   return (
     <>
-      <PageHeader title="Sauvegarde et réglages" subtitle="Tes données restent sur cet ordinateur, dans ce navigateur. Exporte-les régulièrement." />
+      <PageHeader title="Réglages" subtitle="Tes données sont enregistrées sur cet appareil et, si tu es connecté, synchronisées avec ton compte." />
       <div className="space-y-4">
+        <AccountCard />
         <ExportCard />
         <ImportCard />
         <StorageCard />
         <ThemeCard />
       </div>
     </>
+  );
+}
+
+/** Connexion au compte Supabase et état de la synchronisation. */
+function AccountCard() {
+  const sync = useSync();
+  const { run, notify } = useFeedback();
+  const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  if (sync.status === 'disabled') {
+    return (
+      <Card>
+        <CardHeader title="Synchronisation" icon={<Cloud size={14} />} />
+        <p className="px-4 pb-4 text-sm text-muted">
+          Non configurée : l’app fonctionne uniquement sur cet appareil. Renseigne <code className="font-mono text-xs">.env.local</code> (voir <code className="font-mono text-xs">.env.example</code>) pour activer Supabase.
+        </p>
+      </Card>
+    );
+  }
+
+  if (sync.email) {
+    return (
+      <Card>
+        <CardHeader title="Compte et synchronisation" icon={<Cloud size={14} />} action={<SyncBadge />} />
+        <div className="space-y-3 px-4 pb-4 text-sm">
+          <p className="text-muted">
+            Connecté en tant que <strong className="font-medium text-fg">{sync.email}</strong>. Tes modifications sont envoyées automatiquement et arrivent sur tes autres appareils.
+          </p>
+          <ul className="space-y-0.5 text-xs text-faint">
+            <li>Dernière synchronisation : {sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleString('fr-FR') : 'jamais'}</li>
+            <li>Modifications en attente d’envoi : {sync.pending}</li>
+          </ul>
+          <ErrorMessage>{sync.status === 'error' ? `La synchronisation a échoué : ${sync.error}` : ''}</ErrorMessage>
+          <div className="flex flex-wrap gap-2">
+            <Button icon={<RefreshCw size={14} className={cx(sync.status === 'syncing' && 'animate-spin')} />} disabled={sync.status === 'syncing'} onClick={() => run(syncNow, 'Synchronisation terminée')}>
+              Synchroniser maintenant
+            </Button>
+            <Button variant="ghost" icon={<LogOut size={14} />} onClick={() => run(signOut, 'Déconnecté. Tes données restent sur cet appareil.')}>
+              Se déconnecter
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      if (mode === 'signIn') {
+        await signIn(email, password);
+        notify('Connecté : synchronisation en cours');
+      } else if (await signUp(email, password)) {
+        notify('Compte créé : synchronisation en cours');
+      } else {
+        notify('Compte créé. Clique sur le lien reçu par e-mail, puis connecte-toi ici.');
+        setMode('signIn');
+      }
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader title="Compte et synchronisation" icon={<Cloud size={14} />} />
+      <form onSubmit={submit} className="space-y-3 px-4 pb-4">
+        <p className="text-sm text-muted">Connecte-toi pour retrouver tes données sur ton iPhone et ton ordinateur. Ce qui est déjà sur cet appareil est fusionné avec ton compte, rien n’est effacé.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="E-mail">{(id) => <Input id={id} type="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} />}</Field>
+          <Field label="Mot de passe" hint={mode === 'signUp' ? 'Au moins 6 caractères.' : undefined}>
+            {(id) => <Input id={id} type="password" autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />}
+          </Field>
+        </div>
+        <ErrorMessage>{error}</ErrorMessage>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" variant="primary" disabled={busy}>
+            {busy ? 'Un instant…' : mode === 'signIn' ? 'Se connecter' : 'Créer mon compte'}
+          </Button>
+          <Button variant="ghost" onClick={() => (setMode(mode === 'signIn' ? 'signUp' : 'signIn'), setError(''))}>
+            {mode === 'signIn' ? 'Pas encore de compte ? En créer un' : 'J’ai déjà un compte'}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -196,7 +292,7 @@ function StorageCard() {
       <CardHeader title="Stockage" icon={<HardDrive size={14} />} />
       <div className="space-y-3 px-4 pb-4 text-sm text-muted">
         <p>
-          Les données sont enregistrées dans IndexedDB, propre à ce navigateur. Effacer les données de navigation du site les supprime.
+          Les données sont enregistrées dans IndexedDB, propre à ce navigateur. Effacer les données du site les supprime de cet appareil (elles restent dans ton compte si tu es connecté).
           {usage && <> {usage}.</>}
         </p>
         {!supported ? (
@@ -214,20 +310,16 @@ function StorageCard() {
 }
 
 function ThemeCard() {
-  const [theme, setThemeState] = useState<Theme>(getStoredTheme);
-  const choose = (t: Theme) => {
-    setTheme(t);
-    setThemeState(t);
-  };
+  const [theme, choose] = useTheme();
   return (
     <Card>
       <CardHeader title="Apparence" />
       <div className="flex gap-2 px-4 pb-4">
-        <Button variant={theme === 'dark' ? 'primary' : 'secondary'} icon={<Moon size={14} />} onClick={() => choose('dark')}>
-          Sombre
-        </Button>
         <Button variant={theme === 'light' ? 'primary' : 'secondary'} icon={<Sun size={14} />} onClick={() => choose('light')}>
           Clair
+        </Button>
+        <Button variant={theme === 'dark' ? 'primary' : 'secondary'} icon={<Moon size={14} />} onClick={() => choose('dark')}>
+          Sombre
         </Button>
       </div>
     </Card>

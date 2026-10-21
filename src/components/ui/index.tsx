@@ -9,7 +9,7 @@ export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Bool
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-accent-fg hover:opacity-90',
+  primary: 'bg-accent text-accent-fg shadow-sm hover:brightness-110',
   secondary: 'bg-surface-2 text-fg hover:bg-line',
   ghost: 'text-muted hover:text-fg hover:bg-surface-2',
   danger: 'bg-danger/15 text-danger hover:bg-danger/25',
@@ -26,7 +26,7 @@ export function Button({ variant = 'secondary', size = 'md', icon, className, ch
     <button
       type={type}
       className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 ease-smooth active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50',
         size === 'sm' ? 'h-8 px-2.5 text-sm' : 'h-9 px-3.5 text-sm',
         VARIANTS[variant],
         className,
@@ -46,7 +46,7 @@ export function IconButton({ label, icon, className, ...rest }: { label: string;
       type="button"
       aria-label={label}
       title={label}
-      className={cx('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg', className)}
+      className={cx('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-all duration-200 ease-smooth hover:bg-surface-2 hover:text-fg active:scale-90', className)}
       {...rest}
     >
       {icon}
@@ -56,8 +56,9 @@ export function IconButton({ label, icon, className, ...rest }: { label: string;
 
 // ---------- Champs de formulaire ----------
 
+// Sur mobile, texte à 16 px : en dessous, Safari iOS zoome automatiquement sur le champ.
 const fieldClass =
-  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-faint focus:border-accent focus:outline-none';
+  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-fg sm:text-sm transition-[border-color,box-shadow] duration-200 placeholder:text-faint focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
   return <input ref={ref} className={cx(fieldClass, 'h-9', className)} {...rest} />;
@@ -119,12 +120,16 @@ export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: { 
       ref={ref}
       onClose={onClose}
       onMouseDown={(e) => e.target === ref.current && onClose()}
-      className={cx('m-auto w-[calc(100%-2rem)] rounded-xl border border-line bg-surface p-0 text-fg shadow-2xl', width)}
+      // Sur téléphone : panneau qui monte du bas, pleine largeur (plus facile à atteindre au pouce).
+      className={cx(
+        'm-auto w-[calc(100%-2rem)] rounded-2xl border border-line bg-surface p-0 text-fg shadow-2xl max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[env(safe-area-inset-bottom)]',
+        width,
+      )}
     >
       {open && (
-        <div className="flex max-h-[85vh] flex-col">
+        <div className="flex max-h-[85dvh] flex-col">
           <div className="flex items-center justify-between border-b border-line px-5 py-3">
-            <h2 className="text-base font-semibold">{title}</h2>
+            <h2 className="font-serif text-lg font-medium">{title}</h2>
             <IconButton label="Fermer" icon={<X size={16} />} onClick={onClose} />
           </div>
           <div className="overflow-y-auto px-5 py-4">{children}</div>
@@ -154,7 +159,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Supprimer'
 // ---------- Affichage ----------
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cx('rounded-xl border border-line bg-surface', className)}>{children}</section>;
+  return <section className={cx('rounded-2xl border border-line bg-surface shadow-soft', className)}>{children}</section>;
 }
 
 export function CardHeader({ title, action, icon }: { title: string; action?: ReactNode; icon?: ReactNode }) {
@@ -171,10 +176,10 @@ export function CardHeader({ title, action, icon }: { title: string; action?: Re
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <header className="mb-8 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        <h1 className="text-3xl font-normal text-fg">{title}</h1>
+        {subtitle && <p className="mt-1.5 text-sm text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </header>
@@ -209,7 +214,7 @@ export function ProgressBar({ ratio, className }: { ratio: number | null; classN
   const pct = Math.round(ratio * 100);
   return (
     <div className={cx('h-1.5 w-full overflow-hidden rounded-full bg-surface-2', className)} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-      <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
+      <div className="h-full rounded-full bg-accent transition-[width] duration-700 ease-smooth" style={{ width: `${pct}%` }} />
     </div>
   );
 }
@@ -226,7 +231,7 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
           aria-selected={value === it.value}
           onClick={() => onChange(it.value)}
           className={cx(
-            'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors',
+            'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-all duration-200 ease-smooth',
             value === it.value ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg',
           )}
         >

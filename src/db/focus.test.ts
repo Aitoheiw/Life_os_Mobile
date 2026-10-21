@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import { describe, expect, it } from 'vitest';
-import { db, LifeOsDatabase } from './database';
+import { db, LifeOsDatabase, SCHEMA_VERSION } from './database';
 import { recordFocusSession } from './focus';
 import { createTask, deleteTask } from './tasks';
 import { exportBackup, parseBackup } from '../backup/backup';
@@ -48,7 +48,7 @@ describe('sessions de focus', () => {
   });
 });
 
-describe('migration du schéma v1 → v2', () => {
+describe('migration du schéma v1 → version actuelle', () => {
   it('une base v1 existante est mise à niveau sans perte', async () => {
     const name = 'migration-test';
     const v1 = new Dexie(name);
@@ -66,9 +66,10 @@ describe('migration du schéma v1 → v2', () => {
 
     const upgraded = new LifeOsDatabase(name);
     await upgraded.open();
-    expect(upgraded.verno).toBe(2);
+    expect(upgraded.verno).toBe(SCHEMA_VERSION);
     expect((await upgraded.tasks.get('t1'))?.title).toBe('Ancienne tâche');
     expect(await upgraded.focusSessions.count()).toBe(0);
+    expect(await upgraded.syncQueue.count()).toBe(0);
     upgraded.close();
     await Dexie.delete(name);
   });

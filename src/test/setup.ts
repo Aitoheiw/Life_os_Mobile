@@ -9,4 +9,6 @@ beforeEach(async () => {
   await db.transaction('rw', ALL_TABLES.map((t) => db.table(t)), async () => {
     for (const t of ALL_TABLES) await db.table(t).clear();
   });
+  // Le nettoyage ci-dessus remplit la file de synchro : on la vide aussi.
+  await db.syncQueue.clear();
 });

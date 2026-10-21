@@ -1,11 +1,25 @@
 <!doctype html>
-<html lang="fr" class="dark">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f1115" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Tâches, projets, objectifs, habitudes, notes et focus." />
+    <!-- iPhone : app plein écran une fois ajoutée à l'écran d'accueil (Partager → Sur l'écran d'accueil). -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Life OS" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <meta name="theme-color" content="#f4efe6" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <title>Life OS</title>
+    <script>
+      // Applique le thème mémorisé AVANT l'affichage, pour éviter un flash de la mauvaise couleur.
+      try {
+        if (localStorage.getItem('life-os-theme') === 'dark') document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

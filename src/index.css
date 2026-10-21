@@ -1,9 +1,13 @@
 @import 'tailwindcss';
+/* Polices embarquées dans l'app (fontsource) : fonctionnent hors ligne. */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces';
 
 /*
  * Thème : les couleurs sont des variables CSS, redéfinies pour le thème sombre
- * (par défaut, classe `dark` sur <html>). Tailwind les expose sous forme de
- * classes : bg-surface, text-muted, border-line, text-accent, etc.
+ * (classe `dark` sur <html>). Tailwind les expose sous forme de classes :
+ * bg-surface, text-muted, border-line, text-accent, etc.
+ * Ambiance : papier crème, encre chaude, accent terre cuite. Le sombre reste chaud (pas bleuté).
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -21,40 +25,47 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-  --font-sans: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --color-gold: var(--gold);
+  --font-sans: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
-  --bg: #f6f6f4;
-  --surface: #ffffff;
-  --surface-2: #efefec;
-  --line: #e1e1dc;
-  --fg: #1b1d22;
-  --muted: #646a78;
-  --faint: #9a9fab;
-  --accent: #4b5bd0;
-  --accent-fg: #ffffff;
-  --accent-soft: #e6e9fb;
-  --success: #2f8f5f;
-  --warning: #a8741a;
-  --danger: #c2453d;
+  --bg: #f4efe6;
+  --surface: #fbf8f2;
+  --surface-2: #ede6d9;
+  --line: #e2d9c9;
+  --fg: #2b2620;
+  --muted: #6e655a;
+  --faint: #a59c8e;
+  --accent: #a65a3a;
+  --accent-fg: #fbf8f2;
+  --accent-soft: #f1e1d4;
+  --success: #5b7d52;
+  --warning: #a7771f;
+  --danger: #b23f3a;
+  --gold: #b8892b;
+  --shadow: 0 1px 2px rgb(60 45 25 / 0.04), 0 4px 16px -6px rgb(60 45 25 / 0.08);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #0f1115;
-  --surface: #15181e;
-  --surface-2: #1c2028;
-  --line: #262b35;
-  --fg: #e5e7eb;
-  --muted: #8f97a5;
-  --faint: #5c6370;
-  --accent: #8d9cf6;
-  --accent-fg: #0f1115;
-  --accent-soft: #1f2440;
-  --success: #62c08f;
-  --warning: #dcb058;
-  --danger: #e57b74;
+  --bg: #181612;
+  --surface: #201d18;
+  --surface-2: #2a2620;
+  --line: #36312a;
+  --fg: #ece5d8;
+  --muted: #a69c8c;
+  --faint: #6f675b;
+  --accent: #df9471;
+  --accent-fg: #1b1814;
+  --accent-soft: #3b2a20;
+  --success: #9dbf8c;
+  --warning: #d8ae5e;
+  --danger: #e68579;
+  --gold: #e0b75c;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 6px 20px -8px rgb(0 0 0 / 0.4);
   color-scheme: dark;
 }
 
@@ -69,6 +80,30 @@ body {
   color: var(--fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* Mobile / PWA : pas de flash gris au toucher, pas d'effet élastique de toute la page,
+     pas de grossissement automatique du texte en paysage. */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* App installée sur l'écran d'accueil : pas de sélection de texte accidentelle sur les boutons. */
+button,
+a {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Titres de page en serif : touche éditoriale, le reste en sans-serif. */
+h1 {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--fg);
 }
 
 :focus-visible {
@@ -76,12 +111,137 @@ body {
   outline-offset: 2px;
 }
 
+/* ---------- Fenêtres modales : apparition douce ---------- */
+dialog[open] {
+  animation: dialog-in 260ms var(--ease-smooth);
+}
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.55);
+  background: rgb(30 22 12 / 0.4);
+  backdrop-filter: blur(2px);
+  animation: fade-in 260ms var(--ease-smooth);
+}
+
+/* Sur téléphone, les fenêtres montent du bas de l'écran. */
+@media (max-width: 639px) {
+  dialog[open] {
+    animation: sheet-in 340ms var(--ease-smooth);
+  }
+}
+
+/* ---------- Animations réutilisables ---------- */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+/* Petit rebond quand on coche une habitude. */
+@keyframes pop {
+  40% {
+    transform: scale(1.18);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+}
+/* "+12 XP" qui monte et disparaît. */
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -28px);
+  }
+}
+/* Confettis de la journée parfaite. */
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.6);
+  }
+}
+@keyframes flicker {
+  0%,
+  100% {
+    transform: scale(1) rotate(-2deg);
+  }
+  50% {
+    transform: scale(1.08) rotate(2deg);
+  }
+}
+
+@utility animate-rise {
+  animation: rise-in 420ms var(--ease-smooth) both;
+}
+@utility animate-sheet {
+  animation: sheet-in 340ms var(--ease-smooth) both;
+}
+@utility animate-fade {
+  animation: fade-in 300ms var(--ease-smooth) both;
+}
+@utility animate-toast {
+  animation: toast-in 320ms var(--ease-smooth) both;
+}
+@utility animate-pop {
+  animation: pop 380ms var(--ease-smooth);
+}
+@utility animate-float-up {
+  animation: float-up 900ms var(--ease-smooth) forwards;
+}
+@utility animate-flicker {
+  animation: flicker 1.6s ease-in-out infinite;
+}
+
+/* Cartes : légère ombre chaude. */
+@utility shadow-soft {
+  box-shadow: var(--shadow);
+}
+
+/* Changement de thème : fondu enchaîné (View Transitions API, ignorée si non supportée). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 350ms;
+  animation-timing-function: var(--ease-smooth);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
+  *,
+  *::before,
+  *::after,
+  ::view-transition-group(*) {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }
