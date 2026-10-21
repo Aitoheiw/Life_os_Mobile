@@ -115,7 +115,7 @@ export function Layout() {
 function Brand() {
   return (
     <Link to="/" className="flex items-center gap-2 font-serif text-lg">
-      <span className="h-2.5 w-2.5 rounded-full bg-accent" aria-hidden /> Life OS
+      <img src="/icon.svg" alt="" className="h-6 w-6 rounded-md" aria-hidden /> Life OS
     </Link>
   );
 }
