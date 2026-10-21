@@ -29,6 +29,8 @@
   --font-sans: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-serif: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Léger dépassement façon ressort (barre d'onglets mobile). */
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.5, 1);
 }
 
 :root {
@@ -201,6 +203,54 @@ dialog::backdrop {
   }
 }
 
+/* Icône qui apparaît dans la pastille de la barre d'onglets. */
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.4) rotate(-20deg);
+  }
+}
+
+/*
+ * Changement de page : le contenu glisse depuis la droite (on avance dans le menu)
+ * ou la gauche (on recule), et ses blocs arrivent en cascade.
+ * Seuls opacity et transform sont animés : c'est la carte graphique qui travaille, pas de lag.
+ */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translate3d(calc(var(--dir, 1) * 18px), 0, 0);
+  }
+}
+@keyframes block-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+.page-enter {
+  animation: page-in 380ms var(--ease-smooth) both;
+}
+.page-enter > * {
+  animation: block-in 460ms var(--ease-smooth) both;
+}
+/* 45 ms d'écart entre les premiers blocs, plafonné pour ne jamais faire attendre. */
+.page-enter > :nth-child(2) {
+  animation-delay: 45ms;
+}
+.page-enter > :nth-child(3) {
+  animation-delay: 90ms;
+}
+.page-enter > :nth-child(4) {
+  animation-delay: 135ms;
+}
+.page-enter > :nth-child(n + 5) {
+  animation-delay: 180ms;
+}
+
+@utility animate-bubble {
+  animation: bubble-in 420ms var(--ease-spring) both;
+}
 @utility animate-rise {
   animation: rise-in 420ms var(--ease-smooth) both;
 }

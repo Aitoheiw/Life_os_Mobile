@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { CalendarCheck, CheckSquare, FolderKanban, Inbox, LayoutGrid, Lightbulb, Moon, NotebookPen, Plus, Repeat, Settings, Sun, Target, Timer } from 'lucide-react';
 import { useEditors } from './editors';
@@ -34,16 +34,29 @@ const SETTINGS: NavEntry = { to: '/settings', label: 'Réglages et sauvegarde', 
 /** Onglets toujours visibles sur téléphone ; le reste est dans « Plus ». */
 const TAB_PATHS = ['/', '/tasks', '/habits'];
 const byPath = (to: string) => NAV.find((n) => n.to === to)!;
+/** Vrai si `path` appartient à la section `to` (ex. /projects/42 → /projects). */
+const inSection = (path: string, to: string) => (to === '/' ? path === '/' : path === to || path.startsWith(to + '/'));
+/** Position d'une page dans le menu : sert à savoir si l'on « avance » ou « recule ». */
+const pageIndex = (path: string) => [...NAV, SETTINGS].findIndex((n) => inSection(path, n.to));
 
 export function Layout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
   const [lastPath, setLastPath] = useState(location.pathname);
+  // Sens de la transition : 1 = la page arrive par la droite, -1 = par la gauche.
+  const [direction, setDirection] = useState(1);
   // Ferme le menu « Plus » à chaque changement de page.
   if (lastPath !== location.pathname) {
+    setDirection(pageIndex(location.pathname) >= pageIndex(lastPath) ? 1 : -1);
     setLastPath(location.pathname);
     setMoreOpen(false);
   }
+
+  // Nouvelle page : on repart du haut.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [location.pathname]);
 
   return (
     <div className="flex h-full">
@@ -85,9 +98,9 @@ export function Layout() {
         </div>
       </header>
 
-      <main className="min-w-0 flex-1 overflow-y-auto overscroll-contain pt-[calc(3rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
-        {/* La clé change à chaque page : le contenu rejoue son animation d'entrée. */}
-        <div key={location.pathname} className="animate-rise mx-auto max-w-5xl px-4 py-5 md:px-8 md:py-10">
+      <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto overscroll-contain pt-[calc(3rem+env(safe-area-inset-top))] pb-[calc(6rem+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
+        {/* La clé change à chaque page : le contenu rejoue son animation d'entrée (voir `.page-enter` dans index.css). */}
+        <div key={location.pathname} className="page-enter mx-auto max-w-5xl px-4 py-5 md:px-8 md:py-10" style={{ '--dir': direction } as CSSProperties}>
           <Outlet />
         </div>
       </main>
@@ -132,31 +145,54 @@ function NavItem({ to, label, icon, end }: NavEntry) {
 
 // ---------- Téléphone ----------
 
+/**
+ * Barre d'onglets du téléphone. Une « encoche » creusée dans la barre et une pastille
+ * terre cuite glissent jusqu'à l'onglet actif. Seul `transform` est animé → fluide.
+ * Colonnes : 0 Aujourd'hui · 1 Tâches · 2 Ajouter · 3 Habitudes · 4 Plus.
+ */
 function TabBar({ moreOpen, onMore }: { moreOpen: boolean; onMore: () => void }) {
   const { newTask } = useEditors();
   const inbox = useInboxCount();
-  const location = useLocation();
-  const inMore = !TAB_PATHS.some((p) => (p === '/' ? location.pathname === '/' : location.pathname.startsWith(p)));
+  const { pathname } = useLocation();
   const [today, tasks, habits] = TAB_PATHS.map(byPath) as [NavEntry, NavEntry, NavEntry];
 
+  // Colonne de l'indicateur : l'onglet de la page, sinon « Plus » (menu ouvert ou autre page).
+  const tabIndex = [today, tasks, null, habits].findIndex((t) => t !== null && inSection(pathname, t.to));
+  const column = moreOpen || tabIndex < 0 ? 4 : tabIndex;
+  // Icône dans la pastille : celle de la page en cours (ou la grille si le menu est ouvert).
+  const current = [...NAV, SETTINGS].find((n) => inSection(pathname, n.to));
+  const bubbleKey = moreOpen || !current ? 'more' : current.to;
+
   return (
-    <nav aria-label="Navigation principale" className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
-      <div className="mx-auto grid h-16 max-w-md grid-cols-5 items-center px-1">
-        <Tab {...today} />
-        <Tab {...tasks} />
-        <div className="flex justify-center">
-          <button
-            type="button"
-            aria-label="Nouvelle tâche"
-            onClick={() => newTask()}
-            className="grid h-12 w-12 place-items-center rounded-2xl bg-accent text-accent-fg shadow-lg shadow-accent/30 transition-transform duration-200 ease-smooth active:scale-90"
-          >
-            <Plus size={24} strokeWidth={2.4} />
-          </button>
+    <nav aria-label="Navigation principale" className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)] [clip-path:inset(-48px_0_0_0)] md:hidden">
+      <div className="relative mx-auto grid h-16 max-w-md grid-cols-5 items-center px-1">
+        {/* Indicateur : large d'une colonne, déplacé de colonne en colonne. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-1 w-[calc((100%-0.5rem)/5)] transition-transform duration-500 ease-spring will-change-transform"
+          style={{ transform: `translateX(${column * 100}%)` }}
+        >
+          <NotchBackground />
+          <div className="absolute top-1 left-1/2 grid h-[52px] w-[52px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-accent text-accent-fg shadow-lg shadow-accent/35">
+            <span key={bubbleKey} className="animate-bubble grid place-items-center">
+              {bubbleKey === 'more' ? <LayoutGrid size={22} strokeWidth={2.2} /> : current!.icon(22)}
+            </span>
+          </div>
         </div>
-        <Tab {...habits} />
-        <button type="button" onClick={onMore} aria-expanded={moreOpen} className={cx('relative flex flex-col items-center gap-1 py-1 text-[11px] transition-colors', moreOpen || inMore ? 'text-accent' : 'text-muted')}>
-          <LayoutGrid size={22} strokeWidth={moreOpen || inMore ? 2.2 : 1.8} />
+
+        <Tab {...today} covered={column === 0} />
+        <Tab {...tasks} covered={column === 1} />
+        <button type="button" aria-label="Nouvelle tâche" onClick={() => newTask()} className="relative flex flex-col items-center gap-1 py-1 text-[11px] text-muted transition-transform duration-200 ease-smooth active:scale-90">
+          <span className="grid h-[22px] w-[22px] place-items-center rounded-md bg-accent-soft text-accent">
+            <Plus size={17} strokeWidth={2.6} />
+          </span>
+          Ajouter
+        </button>
+        <Tab {...habits} covered={column === 3} />
+        <button type="button" onClick={onMore} aria-expanded={moreOpen} className={cx('relative flex flex-col items-center gap-1 py-1 text-[11px] transition-colors duration-300', column === 4 ? 'font-medium text-accent' : 'text-muted')}>
+          <TabIcon hidden={column === 4}>
+            <LayoutGrid size={22} strokeWidth={1.8} />
+          </TabIcon>
           Plus
           {!!inbox && <span className="absolute top-0 right-[calc(50%-18px)] h-2 w-2 rounded-full bg-accent ring-2 ring-surface" aria-label={`${inbox} idée(s) à traiter`} />}
         </button>
@@ -165,15 +201,33 @@ function TabBar({ moreOpen, onMore }: { moreOpen: boolean; onMore: () => void })
   );
 }
 
-function Tab({ to, label, short, icon, end }: NavEntry) {
+/**
+ * Fond de la barre avec l'encoche. Très large (3000 px) et centré sur l'indicateur :
+ * en le déplaçant, l'encoche suit l'onglet actif sans jamais redessiner la barre.
+ */
+function NotchBackground() {
+  // Creux arrondi de 100 px de large et 36 px de profondeur, centré en x = 1500.
+  const notch = (y: number) => `H1450 C1466,${y} 1464,36 1500,36 C1536,36 1534,${y} 1550,${y}`;
   return (
-    <NavLink to={to} end={end} className={({ isActive }) => cx('flex flex-col items-center gap-1 py-1 text-[11px] transition-colors', isActive ? 'font-medium text-accent' : 'text-muted')}>
-      {({ isActive }) => (
-        <>
-          <span className={cx('transition-transform duration-300 ease-smooth', isActive && '-translate-y-0.5')}>{icon(22)}</span>
-          {short ?? label}
-        </>
-      )}
+    <svg className="absolute top-0 left-1/2 -ml-[1500px] h-[200px] w-[3000px] max-w-none" viewBox="0 0 3000 200">
+      <path d={`M0,0 ${notch(0)} H3000 V200 H0 Z`} className="fill-surface" />
+      {/* Fin trait de séparation qui suit le bord de l'encoche. */}
+      <path d={`M0,0.5 ${notch(0.5)} H3000`} className="fill-none stroke-line" />
+    </svg>
+  );
+}
+
+/** Icône d'onglet : s'efface vers le bas quand la pastille vient se poser dessus. */
+function TabIcon({ hidden, children }: { hidden: boolean; children: ReactNode }) {
+  return <span className={cx('transition-all duration-300 ease-smooth', hidden ? 'translate-y-3 scale-50 opacity-0' : 'opacity-100')}>{children}</span>;
+}
+
+/** `covered` : la pastille est posée sur cet onglet (faux quand le menu « Plus » est ouvert). */
+function Tab({ to, label, short, icon, end, covered }: NavEntry & { covered: boolean }) {
+  return (
+    <NavLink to={to} end={end} className={({ isActive }) => cx('relative flex flex-col items-center gap-1 py-1 text-[11px] transition-colors duration-300', isActive ? 'font-medium text-accent' : 'text-muted')}>
+      <TabIcon hidden={covered}>{icon(22)}</TabIcon>
+      {short ?? label}
     </NavLink>
   );
 }
@@ -186,7 +240,8 @@ function MoreSheet({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="animate-fade fixed inset-0 z-30 bg-fg/25 backdrop-blur-[2px] md:hidden" onClick={onClose} aria-hidden />
-      <div className="animate-sheet fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 rounded-t-3xl border-t border-line bg-surface px-4 pt-3 pb-4 shadow-2xl md:hidden">
+      {/* Le panneau descend derrière la barre d'onglets : l'encoche laisse voir sa couleur, pas le voile. */}
+      <div className="animate-sheet fixed inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-line bg-surface px-4 pt-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] shadow-2xl md:hidden">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" aria-hidden />
         <div className="grid grid-cols-3 gap-2">
           {items.map((item) => (
