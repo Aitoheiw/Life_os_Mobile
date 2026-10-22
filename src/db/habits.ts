@@ -22,11 +22,24 @@ export async function createHabit(input: HabitInput, now = new Date()): Promise<
     startDate: input.startDate ?? today(now),
     pauses: [],
     archivedAt: null,
+    sortOrder: null, // nouvelle habitude → en bas de la liste
     createdAt: ts,
     updatedAt: ts,
   });
   await db.habits.add(habit);
   return habit;
+}
+
+/**
+ * Enregistre un nouvel ordre d'affichage : `orderedIds[0]` en haut.
+ * Seules les habitudes dont la position change sont réécrites (donc synchronisées).
+ */
+export async function reorderHabits(orderedIds: ID[], now = new Date()): Promise<void> {
+  await db.transaction('rw', db.habits, async () => {
+    const habits = await db.habits.bulkGet(orderedIds);
+    const changed = habits.flatMap((h, i) => (h && h.sortOrder !== i ? [validate(habitSchema, { ...h, sortOrder: i, updatedAt: nowIso(now) })] : []));
+    await db.habits.bulkPut(changed);
+  });
 }
 
 export type HabitPatch = Partial<Pick<Habit, 'name' | 'description' | 'frequency' | 'startDate'>>;

@@ -42,6 +42,8 @@ Dexie 4 + dexie-react-hooks, zod 4 (validation, messages FR), react-router 7 (Br
 - Tâches terminées conservées (historique). `postponedCount` s'incrémente si l'échéance est repoussée.
 - Récurrence : une seule occurrence ouverte par série (`seriesId`) ; la suivante est créée en terminant, avec anti-doublon.
 - Priorités du jour : champ `focusDate`, max 3 par jour (vérifié en base).
+- Ordre des habitudes : champ `sortOrder` (null = jamais réordonnée → en bas, par date de création ; zod met null si absent → pas de migration).
+  Tri dans `useHabits()` via `sortHabits` ; bouton « Réorganiser » (flèches) par section, déplacement limité au même statut (`moveHabit`).
 - Habitudes : logs séparés, index unique `[habitId+date]`. Régularité = faits / jours prévus ; aujourd'hui non fait, jours suspendus, avant création ou après archivage ne comptent pas.
 - Progression projet = tâches terminées / tâches (null si 0 tâche). Objectif : par projets terminés ou valeur chiffrée.
 - Migrations : ne jamais modifier `version(1)` ; ajouter `version(N+1)` + upgrade et incrémenter `SCHEMA_VERSION` ; prévoir la migration des sauvegardes anciennes dans `parseBackup`.

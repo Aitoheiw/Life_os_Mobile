@@ -1,5 +1,32 @@
-import type { Habit, HabitLog } from '../models';
+import type { Habit, HabitLog, ID } from '../models';
 import { addDays, dateRange, toLocalDate, weekday, type LocalDate } from './dates';
+
+/**
+ * Ordre d'affichage : la position choisie par l'utilisateur, puis la date de création.
+ * Les habitudes jamais réordonnées (sortOrder null, ou champ absent des anciennes données) vont à la fin.
+ */
+export function sortHabits(habits: Habit[]): Habit[] {
+  const pos = (h: Habit) => h.sortOrder ?? Number.POSITIVE_INFINITY;
+  return [...habits].sort((a, b) => pos(a) - pos(b) || a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
+ * Monte (-1) ou descend (+1) une habitude parmi celles du même statut (actives, suspendues…).
+ * Retourne le nouvel ordre COMPLET des id, ou null si elle est déjà en haut / en bas.
+ */
+export function moveHabit(habits: Habit[], id: ID, direction: -1 | 1): ID[] | null {
+  const sorted = sortHabits(habits);
+  const target = sorted.find((h) => h.id === id);
+  if (!target) return null;
+  const group = sorted.filter((h) => h.status === target.status).map((h) => h.id);
+  const i = group.indexOf(id);
+  const j = i + direction;
+  if (j < 0 || j >= group.length) return null;
+  [group[i], group[j]] = [group[j]!, group[i]!];
+  // Les autres groupes gardent leurs places ; seul l'ordre à l'intérieur du groupe change.
+  let next = 0;
+  return sorted.map((h) => (h.status === target.status ? group[next++]! : h.id));
+}
 
 /** L'habitude est-elle suspendue ce jour-là ? (bornes de pause incluses) */
 export function isPausedOn(habit: Pick<Habit, 'pauses'>, day: LocalDate): boolean {

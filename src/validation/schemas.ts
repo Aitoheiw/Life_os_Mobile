@@ -86,6 +86,8 @@ export const habitSchema = z.object({
   startDate: localDate,
   pauses: z.array(z.object({ from: localDate, to: localDate.nullable() })),
   archivedAt: isoInstant.nullable(),
+  // Absent des anciennes habitudes / sauvegardes / données synchronisées → null (aucune migration nécessaire).
+  sortOrder: z.number().int().min(0).nullable().default(null),
   ...timestamps,
 });
 

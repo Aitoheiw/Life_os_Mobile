@@ -29,6 +29,7 @@ const habit: Habit = {
   startDate: '2026-01-01',
   pauses: [],
   archivedAt: null,
+  sortOrder: null,
   createdAt: '',
   updatedAt: '',
 };

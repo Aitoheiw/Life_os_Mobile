@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Archive, Pause, Pencil, Play, Plus, Repeat, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, ArrowUpDown, Check, ChevronDown, ChevronUp, Pause, Pencil, Play, Plus, Repeat, RotateCcw, Trash2 } from 'lucide-react';
 import type { Habit, HabitFrequency, HabitLog } from '../models';
 import { useHabitLogs, useHabits, useToday } from '../hooks/useData';
-import { archiveHabit, createHabit, deleteHabit, pauseHabit, resumeHabit, toggleHabitLog, unarchiveHabit, updateHabit } from '../db/habits';
-import { describeFrequency, habitStats, isScheduledOn } from '../domain/habits';
+import { archiveHabit, createHabit, deleteHabit, pauseHabit, reorderHabits, resumeHabit, toggleHabitLog, unarchiveHabit, updateHabit } from '../db/habits';
+import { describeFrequency, habitStats, isScheduledOn, moveHabit } from '../domain/habits';
 import { addDays, dateRange, formatShort } from '../domain/dates';
 import { errorMessage, useFeedback } from '../app/feedback';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorMessage, Field, IconButton, Input, Modal, PageHeader, Select, Textarea, cx } from '../components/ui';
@@ -48,14 +48,14 @@ export function HabitsPage() {
         <>
           <ProgressPanel summary={summary} celebrate={celebrate} />
           <div className="space-y-6">
-            <HabitSection title="Actives" habits={active} logs={logs} day={day} summary={summary} onEdit={setEditing} empty="Aucune habitude active." />
-            {paused.length > 0 && <HabitSection title="Suspendues" habits={paused} logs={logs} day={day} summary={summary} onEdit={setEditing} />}
+            <HabitSection title="Actives" habits={active} all={habits} logs={logs} day={day} summary={summary} onEdit={setEditing} empty="Aucune habitude active." />
+            {paused.length > 0 && <HabitSection title="Suspendues" habits={paused} all={habits} logs={logs} day={day} summary={summary} onEdit={setEditing} />}
             {archived.length > 0 && (
               <section>
                 <button type="button" onClick={() => setShowArchived((v) => !v)} className="mb-3 text-xs font-semibold tracking-wide text-muted uppercase hover:text-fg">
                   Archivées ({archived.length}) · {showArchived ? 'masquer' : 'afficher'}
                 </button>
-                {showArchived && <HabitSection habits={archived} logs={logs} day={day} summary={summary} onEdit={setEditing} />}
+                {showArchived && <HabitSection habits={archived} all={habits} logs={logs} day={day} summary={summary} onEdit={setEditing} />}
               </section>
             )}
           </div>
@@ -70,12 +70,36 @@ export function HabitsPage() {
   );
 }
 
-function HabitSection({ title, habits, logs, day, summary, onEdit, empty }: { title?: string; habits: Habit[]; logs: HabitLog[]; day: string; summary: GamificationSummary; onEdit: (h: Habit) => void; empty?: string }) {
+interface HabitSectionProps {
+  title?: string;
+  habits: Habit[];
+  /** Toutes les habitudes (triées) : nécessaire pour calculer le nouvel ordre global. */
+  all: Habit[];
+  logs: HabitLog[];
+  day: string;
+  summary: GamificationSummary;
+  onEdit: (h: Habit) => void;
+  empty?: string;
+}
+
+function HabitSection({ title, habits, all, logs, day, summary, onEdit, empty }: HabitSectionProps) {
+  const [reordering, setReordering] = useState(false);
   return (
     <section>
-      {title && <h2 className="mb-3 text-xs font-semibold tracking-wide text-muted uppercase">{title}</h2>}
+      {(title || habits.length > 1) && (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {title ? <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">{title}</h2> : <span />}
+          {habits.length > 1 && (
+            <Button size="sm" variant={reordering ? 'primary' : 'ghost'} icon={reordering ? <Check size={14} /> : <ArrowUpDown size={14} />} onClick={() => setReordering((r) => !r)}>
+              {reordering ? 'Terminé' : 'Réorganiser'}
+            </Button>
+          )}
+        </div>
+      )}
       {habits.length === 0 ? (
         <p className="text-sm text-muted">{empty}</p>
+      ) : reordering ? (
+        <ReorderList habits={habits} all={all} />
       ) : (
         <Card className="divide-y divide-line">
           {habits.map((h) => (
@@ -84,6 +108,42 @@ function HabitSection({ title, habits, logs, day, summary, onEdit, empty }: { ti
         </Card>
       )}
     </section>
+  );
+}
+
+/** Mode « Réorganiser » : liste compacte avec des flèches pour monter / descendre chaque habitude. */
+function ReorderList({ habits, all }: { habits: Habit[]; all: Habit[] }) {
+  const { run } = useFeedback();
+  // Dernière habitude déplacée : surlignée un court instant pour suivre son déplacement.
+  const [moved, setMoved] = useState<string | null>(null);
+  useEffect(() => {
+    if (!moved) return;
+    const t = window.setTimeout(() => setMoved(null), 700);
+    return () => window.clearTimeout(t);
+  }, [moved]);
+
+  const move = (id: string, direction: -1 | 1) => {
+    const order = moveHabit(all, id, direction);
+    if (!order) return;
+    setMoved(id);
+    void run(() => reorderHabits(order));
+  };
+
+  return (
+    <Card className="divide-y divide-line">
+      {habits.map((h, i) => (
+        <div key={h.id} className={cx('flex items-center gap-3 py-2 pr-2 pl-4 transition-colors duration-500 ease-smooth', moved === h.id && 'bg-accent-soft')}>
+          <span className="w-5 text-right font-mono text-xs text-faint tabular-nums">{i + 1}</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{h.name}</p>
+            <p className="text-xs text-muted">{describeFrequency(h)}</p>
+          </div>
+          {/* Boutons de 40 px : faciles à toucher sur téléphone. */}
+          <IconButton label={`Monter « ${h.name} »`} icon={<ChevronUp size={18} />} className="h-10 w-10 disabled:opacity-30" disabled={i === 0} onClick={() => move(h.id, -1)} />
+          <IconButton label={`Descendre « ${h.name} »`} icon={<ChevronDown size={18} />} className="h-10 w-10 disabled:opacity-30" disabled={i === habits.length - 1} onClick={() => move(h.id, 1)} />
+        </div>
+      ))}
+    </Card>
   );
 }
 

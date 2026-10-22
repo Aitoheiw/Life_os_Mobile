@@ -107,6 +107,8 @@ export interface Habit extends Timestamps {
   startDate: LocalDate;
   pauses: PausePeriod[];
   archivedAt: string | null;
+  /** Position choisie dans la liste (0 = en haut). null = jamais réordonnée → classée par date de création, après les autres. */
+  sortOrder: number | null;
 }
 
 /** Une réalisation = une ligne. Unicité garantie par l'index `[habitId+date]`. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { db } from './database';
-import { archiveHabit, createHabit, pauseHabit, resumeHabit, toggleHabitLog } from './habits';
-import { habitStats, habitsDueOn, isScheduledOn } from '../domain/habits';
+import { archiveHabit, createHabit, pauseHabit, reorderHabits, resumeHabit, toggleHabitLog } from './habits';
+import { habitStats, habitsDueOn, isScheduledOn, moveHabit, sortHabits } from '../domain/habits';
 import { today } from '../domain/dates';
 import type { Habit } from '../models';
 
@@ -48,6 +48,7 @@ describe('régularité et jours prévus', () => {
     startDate: '2026-10-01',
     pauses: [],
     archivedAt: null,
+    sortOrder: null,
     createdAt: '',
     updatedAt: '',
   };
@@ -99,5 +100,43 @@ describe('régularité et jours prévus', () => {
     const archived = await archiveHabit(h.id, at(2026, 10, 5));
     expect(habitsDueOn([archived], '2026-10-06')).toHaveLength(0);
     expect(await db.habitLogs.count()).toBe(1);
+  });
+});
+
+describe('ordre des habitudes', () => {
+  it('nouvelles habitudes à la fin, puis ordre choisi conservé', async () => {
+    await createHabit({ name: 'Lire' }, at(2026, 10, 1));
+    await createHabit({ name: 'Code' }, at(2026, 10, 2));
+    const sport = await createHabit({ name: 'Sport' }, at(2026, 10, 3));
+    const names = async () => sortHabits(await db.habits.toArray()).map((h) => h.name);
+    expect(await names()).toEqual(['Lire', 'Code', 'Sport']);
+
+    // Sport monte d'un cran, puis encore d'un cran → tout en haut.
+    await reorderHabits(moveHabit(await db.habits.toArray(), sport.id, -1)!);
+    await reorderHabits(moveHabit(await db.habits.toArray(), sport.id, -1)!);
+    expect(await names()).toEqual(['Sport', 'Lire', 'Code']);
+    // Déjà en haut : impossible de monter plus.
+    expect(moveHabit(await db.habits.toArray(), sport.id, -1)).toBeNull();
+
+    // Une nouvelle habitude (jamais classée) arrive en bas.
+    await createHabit({ name: 'Anglais' }, at(2026, 10, 4));
+    expect(await names()).toEqual(['Sport', 'Lire', 'Code', 'Anglais']);
+  });
+
+  it('ne déplace qu’à l’intérieur du même statut', async () => {
+    const a = await createHabit({ name: 'A' }, at(2026, 10, 1));
+    const b = await createHabit({ name: 'B' }, at(2026, 10, 2));
+    const c = await createHabit({ name: 'C' }, at(2026, 10, 3));
+    await archiveHabit(b.id, at(2026, 10, 5));
+    // C monte : il passe devant A (B, archivée, est ignorée et garde sa place).
+    await reorderHabits(moveHabit(await db.habits.toArray(), c.id, -1)!);
+    const sorted = sortHabits(await db.habits.toArray());
+    expect(sorted.filter((h) => h.status === 'active').map((h) => h.name)).toEqual(['C', 'A']);
+    expect(sorted.map((h) => h.id)).toContain(a.id);
+  });
+
+  it('une ancienne habitude sans champ sortOrder reste lisible', () => {
+    const old = { id: 'x', name: 'Vieux', createdAt: '2026-01-01T00:00:00.000Z' } as unknown as Habit;
+    expect(sortHabits([old]).map((h) => h.id)).toEqual(['x']);
   });
 });

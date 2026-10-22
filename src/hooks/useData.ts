@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import { today, type LocalDate } from '../domain/dates';
+import { sortHabits } from '../domain/habits';
 
 /**
  * Lectures "vivantes" : les composants se mettent à jour automatiquement
@@ -12,7 +13,8 @@ import { today, type LocalDate } from '../domain/dates';
 export const useTasks = () => useLiveQuery(() => db.tasks.toArray(), []);
 export const useProjects = () => useLiveQuery(() => db.projects.toArray(), []);
 export const useGoals = () => useLiveQuery(() => db.goals.toArray(), []);
-export const useHabits = () => useLiveQuery(() => db.habits.toArray(), []);
+/** Habitudes dans l'ordre choisi par l'utilisateur (voir `sortHabits`). */
+export const useHabits = () => useLiveQuery(async () => sortHabits(await db.habits.toArray()), []);
 export const useHabitLogs = () => useLiveQuery(() => db.habitLogs.toArray(), []);
 export const useNotes = () => useLiveQuery(() => db.notes.orderBy('updatedAt').reverse().toArray(), []);
 export const useReviews = () => useLiveQuery(() => db.weeklyReviews.orderBy('weekStart').reverse().toArray(), []);
