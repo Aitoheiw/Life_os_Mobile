@@ -96,6 +96,19 @@ a {
   user-select: none;
 }
 
+/* Safari iOS : les champs date/heure gardent une largeur minimale native et débordent de leur
+   conteneur. Sans l'apparence native, ils respectent la largeur (le sélecteur s'ouvre toujours au toucher). */
+input[type='date'],
+input[type='time'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+/* Sans apparence native, iOS centrerait la valeur : on l'aligne à gauche comme les autres champs. */
+input::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* Titres de page en serif : touche éditoriale, le reste en sans-serif. */
 h1 {
   font-family: var(--font-serif);
