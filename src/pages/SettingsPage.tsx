@@ -5,6 +5,7 @@ import { SyncBadge } from '../components/SyncBadge';
 import { ALL_TABLES } from '../db/database';
 import { backupFileName, countDatabase, exportBackup, parseBackup, restoreBackup, TABLE_LABELS, type BackupCounts, type ParsedBackup } from '../backup/backup';
 import { errorMessage, useFeedback } from '../app/feedback';
+import { downloadFile } from '../app/files';
 import { useTheme } from '../app/theme';
 import { Button, Card, CardHeader, ErrorMessage, Field, Input, PageHeader, cx } from '../components/ui';
 
@@ -13,12 +14,7 @@ const CONFIRM_WORD = 'REMPLACER';
 async function downloadBackup(): Promise<void> {
   const backup = await exportBackup();
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = backupFileName();
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadFile(blob, backupFileName());
 }
 
 export function SettingsPage() {

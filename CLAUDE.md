@@ -22,6 +22,7 @@ Dexie 4 + dexie-react-hooks, zod 4 (validation, messages FR), react-router 7 (Br
 - `domain/` règles métier PURES et testées : `dates` (jours locaux), `recurrence`, `tasks` (retard, tri, filtres),
   `projects` (progression, prochaine action, progression objectif), `habits` (jours prévus, régularité),
   `today` (progression du jour), `review` (résumé de semaine), `markdown` (parseur sûr), `pomodoro` (machine à états du minuteur),
+  `calendar` (export d'une tâche en `.ics`),
   `gamification` (XP, niveaux, séries, journées parfaites, badges des habitudes).
 - `validation/schemas.ts` schémas zod de toutes les entités + `ValidationError` (message affichable).
 - `db/` SEUL endroit qui écrit en base : `database.ts` (schéma versionné, actuellement v3), `tasks`, `projects` (+ objectifs), `habits`, `notes`, `reviews`, `focus`.
@@ -30,7 +31,7 @@ Dexie 4 + dexie-react-hooks, zod 4 (validation, messages FR), react-router 7 (Br
 - `supabase/schema.sql` table unique `records(user_id, table_name, id, data jsonb, deleted, updated_at)` + RLS ; à exécuter dans le SQL Editor.
 - `backup/backup.ts` export / analyse / réparation des liens / restauration atomique.
 - `hooks/useData.ts` lectures live (`useLiveQuery`) + `useToday()` (change à minuit).
-- `app/` App, Layout (sidebar), `feedback` (toasts + `run()` qui affiche les erreurs), `editors` (modales globales tâche/idée + raccourcis), `pomodoro` (minuteur global), `theme`.
+- `app/` App, Layout (sidebar), `feedback` (toasts + `run()` qui affiche les erreurs), `editors` (modales globales tâche/idée + raccourcis), `pomodoro` (minuteur global), `theme`, `files` (téléchargement / menu de partage).
 - `components/ui` composants génériques (Button, Modal sur `<dialog>`, Field, Card, Tabs, ConfirmDialog…) ; composants métier dans `components/tasks|projects|habits`.
 - `pages/` une page par route.
 
@@ -57,6 +58,10 @@ Dexie 4 + dexie-react-hooks, zod 4 (validation, messages FR), react-router 7 (Br
 - Pomodoro : minuteur basé sur l'instant de fin `endsAt` (jamais un compteur de ticks). État + réglages en localStorage
   (survit au rechargement, synchronisé entre onglets). Seules les sessions de FOCUS terminées sont enregistrées
   (table `focusSessions`, id `focus-<startedAt>` → idempotent). Pas d'enchaînement automatique des phases.
+- Calendrier : bouton « Calendrier » du formulaire de tâche → fichier `.ics` (copie, pas de synchro). Sans heure = toute la journée ;
+  avec heure = heure flottante (fuseau de l'appareil). UID = id de la tâche → réimporter remplace au lieu de dupliquer.
+  Bouton « Partager… » (Web Share) affiché si le navigateur sait partager un fichier (iPhone).
+- Modales imbriquées : `Modal` ignore l'événement `close` remonté par une fenêtre enfant (React le fait remonter).
 - Historique du schéma : v1 = MVP ; v2 = table `focusSessions` ; v3 = table `syncQueue` (technique, non exportée). Les sauvegardes v1/v2 s'importent.
 - Synchro : locale d'abord (l'UI ne lit que Dexie). Envoi = état actuel de l'élément (absent → `deleted`). Réception par curseur `updated_at` (heure SERVEUR, trigger)
   avec 5 s de recouvrement ; une modif locale en attente gagne ; doublons d'index unique (`habitLogs [habitId+date]`, `weeklyReviews weekStart`) → la version serveur gagne.

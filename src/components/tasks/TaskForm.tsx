@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { Trash2 } from 'lucide-react';
+import { CalendarPlus, Trash2 } from 'lucide-react';
 import type { ID, Priority, Recurrence, Task, TaskStatus } from '../../models';
 import { createTask, deleteTask, updateTask } from '../../db/tasks';
 import { useProjects } from '../../hooks/useData';
 import { useFeedback, errorMessage } from '../../app/feedback';
 import { Button, ConfirmDialog, ErrorMessage, Field, Input, Select, Textarea } from '../ui';
 import { WeekdayPicker } from '../WeekdayPicker';
+import { AddToCalendarDialog } from './AddToCalendarDialog';
 import { PRIORITY_LABELS, STATUS_LABELS } from './labels';
 import { weekday as weekdayOf, today } from '../../domain/dates';
 
@@ -32,6 +33,9 @@ export function TaskForm({ task, defaults, onDone }: { task?: Task; defaults?: T
   const [days, setDays] = useState<number[]>(task?.recurrence?.type === 'weekly' ? task.recurrence.days : [weekdayOf(dueDate || today())]);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  // Tâche pas encore créée : identifiant d'événement fixe le temps du formulaire (évite les doublons si on l'ajoute 2 fois).
+  const [calendarUid] = useState(() => crypto.randomUUID());
 
   const buildRecurrence = (): Recurrence | null => {
     const start = dueDate || today();
@@ -83,100 +87,107 @@ export function TaskForm({ task, defaults, onDone }: { task?: Task; defaults?: T
   const activeProjects = (projects ?? []).filter((p) => p.status !== 'done' || p.id === projectId);
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <Field label="Titre">{(id) => <Input id={id} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Que faut-il faire ?" autoFocus required />}</Field>
+    <>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Titre">{(id) => <Input id={id} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Que faut-il faire ?" autoFocus required />}</Field>
 
-      <Field label="Description">{(id) => <Textarea id={id} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Détails, liens, contexte… (facultatif)" rows={3} />}</Field>
+        <Field label="Description">{(id) => <Textarea id={id} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Détails, liens, contexte… (facultatif)" rows={3} />}</Field>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Échéance">{(id) => <Input id={id} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />}</Field>
-        <Field label="Projet">
-          {(id) => (
-            <Select id={id} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-              <option value="">Aucun projet</option>
-              {activeProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label="Priorité">
-          {(id) => (
-            <Select id={id} value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
-              {(Object.keys(PRIORITY_LABELS) as Priority[]).map((p) => (
-                <option key={p} value={p}>
-                  {PRIORITY_LABELS[p]}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label="Statut">
-          {(id) => (
-            <Select id={id} value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
-              {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-      </div>
-
-      <Field label="Répétition" hint={recKind !== 'none' ? 'Quand tu termines la tâche, la suivante est créée automatiquement (une seule à la fois).' : undefined}>
-        {(id) => (
-          <div className="space-y-2">
-            <Select id={id} value={recKind} onChange={(e) => setRecKind(e.target.value as RecurrenceKind)}>
-              <option value="none">Ne se répète pas</option>
-              <option value="daily">Tous les X jours</option>
-              <option value="weekly">Certains jours de la semaine</option>
-              <option value="monthly">Chaque mois (même jour que l’échéance)</option>
-            </Select>
-            {recKind === 'daily' && (
-              <div className="flex items-center gap-2 text-sm text-muted">
-                Tous les
-                <Input type="number" min={1} max={365} value={interval} onChange={(e) => setRecInterval(Math.max(1, Number(e.target.value) || 1))} className="w-20" aria-label="Intervalle en jours" />
-                jour(s)
-              </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Échéance">{(id) => <Input id={id} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />}</Field>
+          <Field label="Projet">
+            {(id) => (
+              <Select id={id} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                <option value="">Aucun projet</option>
+                {activeProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </Select>
             )}
-            {recKind === 'weekly' && <WeekdayPicker value={days} onChange={setDays} />}
-          </div>
-        )}
-      </Field>
-
-      <ErrorMessage>{error}</ErrorMessage>
-
-      <div className="flex items-center justify-between gap-2 pt-1">
-        {task ? (
-          <Button variant="ghost" icon={<Trash2 size={15} />} onClick={() => setConfirmDelete(true)}>
-            Supprimer
-          </Button>
-        ) : (
-          <span />
-        )}
-        <div className="flex gap-2">
-          <Button onClick={onDone}>Annuler</Button>
-          <Button type="submit" variant="primary">
-            {task ? 'Enregistrer' : 'Créer la tâche'}
-          </Button>
+          </Field>
+          <Field label="Priorité">
+            {(id) => (
+              <Select id={id} value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
+                {(Object.keys(PRIORITY_LABELS) as Priority[]).map((p) => (
+                  <option key={p} value={p}>
+                    {PRIORITY_LABELS[p]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Statut">
+            {(id) => (
+              <Select id={id} value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
+                {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
         </div>
-      </div>
 
-      <ConfirmDialog
-        open={confirmDelete}
-        title="Supprimer la tâche ?"
-        message={
-          <>
-            « {task?.title} » sera supprimée définitivement.
-            {task?.status !== 'done' && ' Pour garder une trace, tu peux plutôt la marquer comme terminée.'}
-          </>
-        }
-        onCancel={() => setConfirmDelete(false)}
-        onConfirm={remove}
-      />
-    </form>
+        <Field label="Répétition" hint={recKind !== 'none' ? 'Quand tu termines la tâche, la suivante est créée automatiquement (une seule à la fois).' : undefined}>
+          {(id) => (
+            <div className="space-y-2">
+              <Select id={id} value={recKind} onChange={(e) => setRecKind(e.target.value as RecurrenceKind)}>
+                <option value="none">Ne se répète pas</option>
+                <option value="daily">Tous les X jours</option>
+                <option value="weekly">Certains jours de la semaine</option>
+                <option value="monthly">Chaque mois (même jour que l’échéance)</option>
+              </Select>
+              {recKind === 'daily' && (
+                <div className="flex items-center gap-2 text-sm text-muted">
+                  Tous les
+                  <Input type="number" min={1} max={365} value={interval} onChange={(e) => setRecInterval(Math.max(1, Number(e.target.value) || 1))} className="w-20" aria-label="Intervalle en jours" />
+                  jour(s)
+                </div>
+              )}
+              {recKind === 'weekly' && <WeekdayPicker value={days} onChange={setDays} />}
+            </div>
+          )}
+        </Field>
+
+        <ErrorMessage>{error}</ErrorMessage>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex gap-1">
+            {task && (
+              <Button variant="ghost" icon={<Trash2 size={15} />} onClick={() => setConfirmDelete(true)}>
+                Supprimer
+              </Button>
+            )}
+            <Button variant="ghost" icon={<CalendarPlus size={15} />} onClick={() => setCalendarOpen(true)}>
+              Calendrier
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={onDone}>Annuler</Button>
+            <Button type="submit" variant="primary">
+              {task ? 'Enregistrer' : 'Créer la tâche'}
+            </Button>
+          </div>
+        </div>
+
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Supprimer la tâche ?"
+          message={
+            <>
+              « {task?.title} » sera supprimée définitivement.
+              {task?.status !== 'done' && ' Pour garder une trace, tu peux plutôt la marquer comme terminée.'}
+            </>
+          }
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={remove}
+        />
+      </form>
+      {/* Hors du <form> : sinon Entrée dans ses champs enregistrerait la tâche. Utilise les valeurs en cours de saisie. */}
+      <AddToCalendarDialog open={calendarOpen} onClose={() => setCalendarOpen(false)} task={{ uid: task?.id ?? calendarUid, title, description, dueDate: dueDate || null }} />
+    </>
   );
 }

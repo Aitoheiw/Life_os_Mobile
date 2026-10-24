@@ -118,7 +118,8 @@ export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: { 
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      // React fait remonter `close` d'une fenêtre imbriquée (ex. confirmation) jusqu'ici : on ignore celles des enfants.
+      onClose={(e) => e.target === e.currentTarget && onClose()}
       onMouseDown={(e) => e.target === ref.current && onClose()}
       // Sur téléphone : panneau qui monte du bas, pleine largeur (plus facile à atteindre au pouce).
       className={cx(
