@@ -75,7 +75,8 @@ function CalendarForm({ task, onDone }: { task: CalendarTask; onDone: () => void
       <p className="truncate text-sm font-medium text-fg" title={task.title}>
         {task.title.trim() || 'Tâche sans titre'}
       </p>
-      <div className="grid grid-cols-2 gap-3">
+      {/* Empilés sur téléphone : sur iPhone, un champ date ne rétrécit pas et chevaucherait l'heure. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Jour">{(id) => <Input id={id} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />}</Field>
         <Field label="Heure (facultatif)">{(id) => <Input id={id} type="time" value={time} onChange={(e) => setTime(e.target.value)} />}</Field>
       </div>
